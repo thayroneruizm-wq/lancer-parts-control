@@ -1,0 +1,12 @@
+services:
+  lancer-parts-control:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./instance:/app/instance
+    environment:
+      LPC_INSTANCE: /app/instance
+      LPC_SECRET_KEY: ${LPC_SECRET_KEY:?Configure a secret in your host environment}
+      LPC_SECURE_COOKIES: "0" # Change to 1 ONLY behind real HTTPS.
+    restart: unless-stopped
