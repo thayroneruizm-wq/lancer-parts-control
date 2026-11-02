@@ -1,0 +1,39 @@
+# Never commit real credentials, production configuration or customer data.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# Runtime databases, session signing keys, and backups.
+instance/*
+!instance/.gitkeep
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.bak
+*.backup
+*.log
+
+# Python / IDE / OS.
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.py[cod]
+.DS_Store
+.idea/
+.vscode/
+
+# Local builds and archives.
+dist/
+build/
+*.zip
