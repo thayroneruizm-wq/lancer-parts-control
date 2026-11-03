@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111216">
+  <meta name="csrf-token" content="{{ csrf }}">
+  <title>{{ title if title is defined else 'Lancer Parts Control' }} · Lancer Parts</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside id="sidebar" class="sidebar">
+      <a class="brand" href="/"><span class="brand-mark">L<span class="brand-accent">/</span>P</span><span class="brand-text">LANCER PARTS <small>CONTROL <span class="brand-tiny-dot"></span></small></span></a>
+      <div class="workspace"><span class="workspace-avatar">LP</span><span><b>Operação Lancer Parts</b><small>Central administrativa</small></span><span class="workspace-chevron">⌄</span></div>
+      <div class="menu-overline">PAINEL OPERACIONAL</div>
+      <nav aria-label="Menu principal" class="nav-menu">
+        {% for key,label,icon,url in nav %}
+          {% set group = 'active' if section == key else '' %}
+          {% if key == 'integrations' or key == 'team' or key == 'settings' %}{% if key == 'integrations' %}<div class="menu-overline menu-secondary">SISTEMA E ACESSOS</div>{% endif %}{% endif %}
+          <a href="{{ url }}" class="nav-link {{ group }}" {% if group %}aria-current="page"{% endif %}>
+            <span class="nav-icon {{ key }}" aria-hidden="true">{% if key=='dashboard' %}▦{% elif key=='clients' %}♧{% elif key=='pipeline' %}▥{% elif key=='followups' %}◷{% elif key=='whatsapp' %}◉{% elif key=='orders' %}▤{% elif key=='logistics' %}➞{% elif key=='stock' %}▧{% elif key=='production' %}⚙{% elif key=='finance' %}＄{% elif key=='marketing' %}✧{% elif key=='after-sales' %}♡{% elif key=='tasks' %}☑{% elif key=='reports' %}▥{% elif key=='insights' %}✦{% elif key=='integrations' %}⌁{% elif key=='team' %}♙{% else %}⚙{% endif %}</span>
+            <span class="nav-title">{{ label }}</span>
+            {% if key in ['whatsapp','logistics','stock','production','finance','marketing','after-sales','insights'] %}<span class="nav-next">·</span>{% endif %}
+          </a>
+        {% endfor %}
+      </nav>
+      <div class="sidebar-bottom"><span class="status-led"></span><span>Ambiente local <small>Integrações desconectadas</small></span></div>
+    </aside>
+    <div class="main-area">
+      <header class="topbar">
+        <div class="top-left"><button type="button" class="menu-button" id="menuToggle" aria-label="Abrir menu">☰</button><span class="breadcrumb">LANCER PARTS</span><span class="crumb-sep">/</span><span class="breadcrumb-current">{% if section == 'dashboard' %}Visão geral{% else %}{{ title if title is defined else section|title }}{% endif %}</span></div>
+        <div class="top-right"><form method="get" action="/search" class="global-search"><span>⌕</span><input name="q" aria-label="Pesquisa global" placeholder="Buscar clientes, pedidos, produtos..." value="{{ q if q is defined else '' }}"><kbd>↵</kbd></form><span class="top-divider"></span><div class="top-user"><span class="avatar">{{ user.name[:1]|upper if user else 'L' }}</span><span class="top-username">{{ user.name if user else '' }}<small>{{ user.role|capitalize if user else '' }}</small></span></div><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="logout" title="Sair" aria-label="Sair">↗</button></form></div>
+      </header>
+      <main class="content">
+        {% if success %}<div class="alert success">✓ {{ success }}</div>{% endif %}
+        {% if error %}<div class="alert danger">! {{ error }}</div>{% endif %}
+        {% block content %}{% endblock %}
+        <footer class="footer">LANCER PARTS CONTROL <span>•</span> Release operacional 0.1 <span>•</span> Dados locais persistidos <span>•</span> Sem integração ativa</footer>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

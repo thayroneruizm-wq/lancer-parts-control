@@ -1,0 +1,16 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><span class="overline">CRM / {{ 'EDIÇÃO' if is_edit else 'NOVO REGISTRO' }}</span><h1>{{ 'Editar cliente' if is_edit else 'Novo cliente' }}</h1><p>Dados comerciais, veículo, responsável e informações de contato.</p></div><a class="btn btn-ghost" href="{{ '/clients/' ~ item.id if is_edit else '/clients' }}">← Voltar</a></div>
+<form method="post" class="panel form-card stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="form-note">Os dados são armazenados localmente. Um cliente com o mesmo telefone ou CPF/CNPJ não será cadastrado novamente.</div><div class="form-grid">
+<label>Nome completo *<input name="name" required maxlength="150" value="{{ item.name or '' }}" placeholder="Nome do cliente"></label><label>Telefone / WhatsApp<input name="phone" value="{{ item.phone or '' }}" placeholder="(62) 99999-9999"></label>
+<label>E-mail<input name="email" type="email" value="{{ item.email or '' }}"></label><label>CPF/CNPJ (quando necessário)<input name="document" value="{{ item.document or '' }}"></label>
+<label>Cidade<input name="city" value="{{ item.city or '' }}"></label><label>Estado<input name="state" maxlength="2" value="{{ item.state or '' }}" placeholder="GO"></label>
+<label class="span-2">Endereço de entrega<textarea name="address" rows="2">{{ item.address or '' }}</textarea></label>
+<label>Modelo do veículo<select name="vehicle_model"><option value="">Não informado</option>{% for v in vehicles %}<option value="{{ v }}" {{ 'selected' if item.vehicle_model==v else '' }}>{{ v }}</option>{% endfor %}</select></label>
+<label>Ano do veículo<input type="number" min="1980" max="2100" name="vehicle_year" value="{{ item.vehicle_year or '' }}"></label>
+<label>Origem<select name="origin"><option value="">Selecione...</option>{% for x in ['WhatsApp','Instagram','Facebook','Site','Indicação','Outro'] %}<option value="{{ x }}" {{ 'selected' if item.origin==x else '' }}>{{ x }}</option>{% endfor %}</select></label>
+<label>Responsável<select name="owner_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if item.owner_id==u.id or (not item.owner_id and user.id==u.id) else '' }}>{{ u.name }}</option>{% endfor %}</select></label>
+<label class="span-2">Modificações já realizadas<textarea name="modifications" rows="2" placeholder="Ex.: coletor, intake, rodas...">{{ item.modifications or '' }}</textarea></label>
+<label class="span-2">Produtos de interesse<textarea name="interests" rows="2" placeholder="Itens que pretende adquirir">{{ item.interests or '' }}</textarea></label>
+<label>Etiquetas (separadas por vírgula)<input name="tags" value="{{ item.tags or '' }}" placeholder="VIP, coletor, aguardando promoção"></label>
+<label class="span-2">Observações internas<textarea name="notes" rows="3">{{ item.notes or '' }}</textarea></label>
+</div><div class="form-actions"><a class="btn btn-ghost" href="/clients">Cancelar</a><button class="btn btn-primary">✓ Salvar cliente</button></div></form>{% endblock %}
