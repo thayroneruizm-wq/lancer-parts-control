@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><span class="overline">PRODUÇÃO / {{ 'EDIÇÃO' if is_edit else 'NOVO LOTE' }}</span><h1>{{ 'Editar lote ' ~ item.code if is_edit else 'Novo lote de produção' }}</h1><p>Defina o produto e a quantidade planejada. As unidades finalizadas são apontadas na tela do lote.</p></div><a href="{{ '/production/' ~ item.id if is_edit else '/production' }}" class="btn">← Voltar</a></div>
+<form method="post" class="panel form-card stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="form-grid">
+<label>Produto<select name="product_id"><option value="">Selecione...</option>{% for p in products %}<option value="{{ p.id }}" {{ 'selected' if item.product_id==p.id else '' }}>{{ p.name }}</option>{% endfor %}</select></label>
+<label>Quantidade planejada *<input name="qty_planned" type="number" min="1" max="100000" required value="{{ item.qty_planned or '' }}"></label>
+<label>Ou cadastrar novo produto<input name="new_product" maxlength="255" placeholder="Ex.: Coletor 4x2x1 Full Inox"></label>
+<label>SKU do novo produto<input name="new_sku" maxlength="100"></label>
+<label>Código do lote<input name="code" maxlength="40" value="{{ item.code or '' }}" placeholder="Em branco = gerado automaticamente"></label>
+<label>Prazo previsto<input type="datetime-local" name="due_at" value="{{ (item.due_at or '')[:16] }}"></label>
+<label>Responsável<select name="owner_id">{% for x in users %}<option value="{{ x.id }}" {{ 'selected' if item.owner_id==x.id or (not item.owner_id and user.id==x.id) else '' }}>{{ x.name }}</option>{% endfor %}</select></label>
+<label class="span-2">Anotações<textarea name="notes" rows="3">{{ item.notes or '' }}</textarea></label>
+</div><div class="form-actions"><a class="btn" href="/production">Cancelar</a><button class="btn btn-primary">✓ Salvar lote</button></div></form>
+{% endblock %}

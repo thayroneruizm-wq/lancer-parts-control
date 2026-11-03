@@ -1,0 +1,6 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><span class="overline">OPERAÇÃO / CONTROLE DE PEDIDOS</span><h1>Controle de pedidos</h1><p>Acompanhe cada compra: pagamento, preparo, embalagem, rastreio, envio, entrega e aviso ao cliente.</p></div><div class="page-actions"><a class="btn" href="/orders">Lista de pedidos</a><a class="btn btn-primary" href="/orders/new">＋ Novo pedido</a></div></div>
+<div class="tabs">{% for key,label in tabs %}<a class="tab {{ 'active' if stage==key else '' }}" href="/controle-pedidos?stage={{ key }}{{ '&q='~(q|urlencode) if q else '' }}">{{ label }} <small>({{ counts[key] }})</small></a>{% endfor %}</div>
+<form method="get" class="filters"><input type="hidden" name="stage" value="{{ stage }}"><input type="search" name="q" placeholder="Pedido, cliente ou código de rastreio" value="{{ q }}"><button class="btn">Buscar</button><a class="btn btn-ghost" href="/controle-pedidos?stage={{ stage }}">Limpar</a></form>
+<div class="panel">{% include '_order_control.html' %}</div>
+{% endblock %}

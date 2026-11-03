@@ -1,0 +1,11 @@
+{% from '_macros.html' import steps, quick with context %}
+<div class="table-wrap"><table class="table ctl-table"><thead><tr><th>Pedido / cliente</th><th>Itens</th><th>Etapa</th><th>Checklist de envio</th><th>Previsão / rastreio</th><th>Ações rápidas</th></tr></thead><tbody>
+{% for r in rows %}{% set ctl=r.ctl %}<tr class="{{ 'row-alert' if ctl.problem or ctl.overdue else '' }}">
+<td><a class="main-link" href="/orders/{{ r.id }}">#{{ r.order_number }}</a><small class="subline"><a href="/clients/{{ r.client_id }}">{{ r.client_name }}</a></small><small class="subline">{{ r.source }} · criado há {{ ctl.age_days }} dia(s)</small></td>
+<td class="items-cell">{{ r.items_text or '—' }}</td>
+<td><span class="pill {{ ctl.stage_class }}">{{ ctl.stage }}</span>{% if ctl.overdue %}<span class="pill pill-red">Prazo vencido</span>{% endif %}<small class="subline">Pagamento: {{ r.payment_status }}</small></td>
+<td>{{ steps(ctl) }}</td>
+<td>{{ fmt_date(r.due_at) }}<small class="subline">{{ r.carrier or '—' }}{% if r.tracking_code %} · {{ r.tracking_code }}{% endif %}</small></td>
+<td>{{ quick(r,ctl,next_url) }}</td></tr>
+{% else %}<tr><td colspan="6"><div class="empty"><span class="empty-symbol">✓</span><h3>Nenhum pedido nesta seleção</h3><p>Quando houver pedidos nesta etapa, eles aparecerão aqui com o checklist de envio.</p></div></td></tr>{% endfor %}
+</tbody></table></div>
