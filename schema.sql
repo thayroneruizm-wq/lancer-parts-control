@@ -64,4 +64,12 @@ CREATE TABLE IF NOT EXISTS integrations (
  service TEXT PRIMARY KEY, status TEXT NOT NULL DEFAULT 'Desconectado',
  last_sync_at TEXT, last_error TEXT, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS production_batches (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, product TEXT NOT NULL DEFAULT 'Coletor Cat Delete', vehicle_model TEXT, batch_code TEXT,
+ quantity INTEGER NOT NULL CHECK(quantity>0), status TEXT NOT NULL DEFAULT 'Em produção' CHECK(status IN ('Em produção','Finalizado','Vendido')),
+ client_id INTEGER REFERENCES clients(id), owner_id INTEGER REFERENCES users(id), notes TEXT,
+ started_at TEXT, finished_at TEXT, sold_at TEXT,
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_production_status ON production_batches(status);
 INSERT OR IGNORE INTO integrations (service) VALUES ('Nuvemshop'), ('WhatsApp Business'), ('Melhor Envio');

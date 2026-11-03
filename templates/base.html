@@ -6,13 +6,14 @@
   <meta name="theme-color" content="#111216">
   <meta name="csrf-token" content="{{ csrf }}">
   <title>{{ title if title is defined else 'Lancer Parts Control' }} · Lancer Parts</title>
+  <link rel="icon" type="image/png" href="/static/logo-original.png">
   <link rel="stylesheet" href="/static/style.css">
   <script defer src="/static/app.js"></script>
 </head>
 <body>
   <div class="app-shell">
     <aside id="sidebar" class="sidebar">
-      <a class="brand" href="/"><span class="brand-mark">L<span class="brand-accent">/</span>P</span><span class="brand-text">LANCER PARTS <small>CONTROL <span class="brand-tiny-dot"></span></small></span></a>
+      <a class="brand brand-logo" href="/" aria-label="Lancer Parts Control - início"><span class="logo-crop logo-sidebar"><img src="/static/logo-original.png" alt="Lancer Parts"></span><span class="brand-text"><small>CONTROL <span class="brand-tiny-dot"></span></small></span></a>
       <div class="workspace"><span class="workspace-avatar">LP</span><span><b>Operação Lancer Parts</b><small>Central administrativa</small></span><span class="workspace-chevron">⌄</span></div>
       <div class="menu-overline">PAINEL OPERACIONAL</div>
       <nav aria-label="Menu principal" class="nav-menu">
@@ -22,7 +23,7 @@
           <a href="{{ url }}" class="nav-link {{ group }}" {% if group %}aria-current="page"{% endif %}>
             <span class="nav-icon {{ key }}" aria-hidden="true">{% if key=='dashboard' %}▦{% elif key=='clients' %}♧{% elif key=='pipeline' %}▥{% elif key=='followups' %}◷{% elif key=='whatsapp' %}◉{% elif key=='orders' %}▤{% elif key=='logistics' %}➞{% elif key=='stock' %}▧{% elif key=='production' %}⚙{% elif key=='finance' %}＄{% elif key=='marketing' %}✧{% elif key=='after-sales' %}♡{% elif key=='tasks' %}☑{% elif key=='reports' %}▥{% elif key=='insights' %}✦{% elif key=='integrations' %}⌁{% elif key=='team' %}♙{% else %}⚙{% endif %}</span>
             <span class="nav-title">{{ label }}</span>
-            {% if key in ['whatsapp','logistics','stock','production','finance','marketing','after-sales','insights'] %}<span class="nav-next">·</span>{% endif %}
+            {% if key in ['whatsapp','logistics','stock','finance','marketing','after-sales','insights'] %}<span class="nav-next">·</span>{% endif %}
           </a>
         {% endfor %}
       </nav>

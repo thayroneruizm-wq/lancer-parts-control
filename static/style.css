@@ -5,3 +5,23 @@
 @media(max-width:660px){.topbar{padding:0 13px}.global-search{width:145px}.global-search kbd,.breadcrumb,.crumb-sep,.top-divider{display:none}.content{padding:23px 13px}.page-head{display:block}.page-actions{margin-top:17px}.stats{gap:9px}.stat{padding:15px 12px;min-height:105px}.stat-number{font-size:19px}.stat-header{font-size:10px}.form-grid,.info-grid,.search-results,.integration-grid{grid-template-columns:1fr}.form-grid .span-2{grid-column:1}.panel-heading{padding:14px}.stat-hint{font-size:9px}.quick-grid{padding:12px}.login-screen{grid-template-columns:1fr}.login-left{display:none}.login-right{min-height:100vh}.form-card{padding:15px}}
 /* Spacing helpers preserve strict CSP without inline style attributes. */
 .panel + .panel{margin-top:16px}.integration-grid + .notice{margin-top:18px}.quick-grid + .notice{margin:0 19px 19px}.stat-number.long{font-size:18px}
+
+/* Lancer Parts logo: crop the square artwork to the wordmark bounding box */
+.logo-crop{display:block;overflow:hidden;aspect-ratio:300/220;flex-shrink:0}
+.logo-crop img{display:block;width:166.7%;max-width:none;margin:-45% 0 0 -33.3%}
+.brand-logo{display:flex;align-items:center;gap:10px}
+.logo-sidebar{width:96px}
+.logo-login{width:170px;margin-bottom:10px}
+.login-brand{letter-spacing:normal}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.wa-link{display:block;color:#83d8b0;font-size:12px;font-weight:700;text-decoration:none;margin-top:2px}
+.wa-link:hover{text-decoration:underline}
+.stat-link{text-decoration:none;color:inherit;display:block;transition:border-color .15s}
+.stat-link:hover,.stat-active{border-color:var(--red)}
+.production-grid{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);align-items:start}
+.inline-action{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.qty-input{width:64px;min-height:30px;padding:4px 8px}
+.client-select{max-width:170px;min-height:30px;padding:4px 8px}
+.qty{font-size:18px;font-weight:900}
+.muted-text{color:var(--muted,#8b8790);font-size:12px}
+@media(max-width:1000px){.production-grid{grid-template-columns:1fr}}

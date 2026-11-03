@@ -1,0 +1,39 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><span class="overline">FÁBRICA / CONTROLE DE PRODUÇÃO</span><h1>Produção</h1><p>Acompanhe cada coletor Cat Delete desde a fabricação até a venda.</p></div>{% if can_edit %}<a href="/production/new" class="btn btn-primary">＋ Iniciar produção</a>{% endif %}</div>
+
+<div class="stats">
+ <a class="stat stat-link {{ 'stat-active' if status=='Em produção' else '' }}" href="/production?status=Em produção{% if product %}&product={{ product|urlencode }}{% endif %}"><div class="stat-header">Em produção <span class="stat-icon">⚙</span></div><div class="stat-number">{{ totals['Em produção'] }}</div><div class="stat-hint">unidade(s) sendo fabricadas agora</div></a>
+ <a class="stat stat-link {{ 'stat-active' if status=='Finalizado' else '' }}" href="/production?status=Finalizado{% if product %}&product={{ product|urlencode }}{% endif %}"><div class="stat-header">Finalizados <span class="stat-icon">✓</span></div><div class="stat-number">{{ totals['Finalizado'] }}</div><div class="stat-hint">prontos em estoque para venda</div></a>
+ <a class="stat stat-link {{ 'stat-active' if status=='Vendido' else '' }}" href="/production?status=Vendido{% if product %}&product={{ product|urlencode }}{% endif %}"><div class="stat-header">Vendidos <span class="stat-icon">＄</span></div><div class="stat-number">{{ totals['Vendido'] }}</div><div class="stat-hint">{{ month_sold }} vendido(s) neste mês</div></a>
+ <div class="stat"><div class="stat-header">Total produzido <span class="stat-icon">▤</span></div><div class="stat-number">{{ totals['Em produção'] + totals['Finalizado'] + totals['Vendido'] }}</div><div class="stat-hint">{{ month_done }} finalizado(s) neste mês</div></div>
+</div>
+
+<div class="tabs">
+ <a class="tab {{ 'active' if not status else '' }}" href="/production{% if product %}?product={{ product|urlencode }}{% endif %}">Todos</a>
+ {% for s in production_states %}<a class="tab {{ 'active' if status==s else '' }}" href="/production?status={{ s|urlencode }}{% if product %}&product={{ product|urlencode }}{% endif %}">{{ s }}</a>{% endfor %}
+</div>
+
+<div class="section-grid production-grid">
+<section class="panel"><div class="panel-heading"><h2>Lotes e unidades</h2><span class="pill">{{ rows|length }} registro(s)</span></div><div class="table-wrap"><table class="table"><thead><tr><th>Produto</th><th>Qtd.</th><th>Status</th><th>Datas</th><th>Cliente</th>{% if can_edit %}<th>Ação</th>{% endif %}</tr></thead><tbody>
+{% for p in rows %}<tr>
+ <td><b>{{ p.product }}</b><small class="subline">{{ p.vehicle_model or 'Modelo não informado' }}{% if p.batch_code %} · Lote {{ p.batch_code }}{% endif %}</small>{% if p.notes %}<small class="subline">{{ p.notes }}</small>{% endif %}</td>
+ <td><span class="qty">{{ p.quantity }}</span></td>
+ <td><span class="pill {{ 'pill-yellow' if p.status=='Em produção' else 'pill-green' if p.status=='Finalizado' else 'pill-blue' }}">{{ p.status }}</span></td>
+ <td><small class="subline">Início {{ fmt_date(p.started_at) }}</small>{% if p.finished_at %}<small class="subline">Finalizado {{ fmt_date(p.finished_at) }}</small>{% endif %}{% if p.sold_at %}<small class="subline">Vendido {{ fmt_date(p.sold_at) }}</small>{% endif %}</td>
+ <td>{% if p.client_id %}{% if user.role in ['admin','gerente','vendedor'] %}<a class="main-link" href="/clients/{{ p.client_id }}">{{ p.client_name }}</a>{% else %}{{ p.client_name }}{% endif %}{% if p.client_phone %}<a class="wa-link" href="{{ wa_link(p.client_phone) }}" target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>{% endif %}{% else %}—{% endif %}</td>
+ {% if can_edit %}<td>
+  {% if p.status=='Em produção' %}
+  <form method="post" action="/production/{{ p.id }}/advance" class="inline-action"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="sr-only" for="qf{{ p.id }}">Quantidade a finalizar</label><input id="qf{{ p.id }}" class="qty-input" type="number" name="quantity" min="1" max="{{ p.quantity }}" value="{{ p.quantity }}"><button class="btn btn-sm">✓ Finalizar</button></form>
+  {% elif p.status=='Finalizado' %}
+  <form method="post" action="/production/{{ p.id }}/advance" class="inline-action"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="sr-only" for="qv{{ p.id }}">Quantidade vendida</label><input id="qv{{ p.id }}" class="qty-input" type="number" name="quantity" min="1" max="{{ p.quantity }}" value="1"><label class="sr-only" for="cv{{ p.id }}">Cliente</label><select id="cv{{ p.id }}" name="client_id" class="client-select"><option value="">Cliente (opcional)</option>{% for cl in clients_list %}<option value="{{ cl.id }}">{{ cl.name }}</option>{% endfor %}</select><button class="btn btn-sm btn-primary">＄ Vender</button></form>
+  {% else %}<span class="muted-text">Concluído</span>{% endif %}
+  {% if user.role in ['admin','gerente'] %}<form method="post" action="/production/{{ p.id }}/delete" class="inline-action" data-confirm="Remover este registro de produção?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-ghost" aria-label="Remover registro">Remover</button></form>{% endif %}
+ </td>{% endif %}
+</tr>{% else %}<tr><td colspan="6"><div class="empty"><span class="empty-symbol">⚙</span><h3>Nenhuma produção registrada</h3><p>Inicie um lote de coletores Cat Delete para começar o controle.</p>{% if can_edit %}<a href="/production/new" class="btn btn-primary">Iniciar produção</a>{% endif %}</div></td></tr>{% endfor %}
+</tbody></table></div></section>
+
+<section class="panel"><div class="panel-heading"><h2>Por modelo de veículo</h2></div><div class="table-wrap"><table class="table"><thead><tr><th>Modelo</th><th>Produzindo</th><th>Finalizados</th><th>Vendidos</th></tr></thead><tbody>
+{% for m in by_model %}<tr><td><b>{{ m.model }}</b></td><td>{{ m.prod }}</td><td>{{ m.done }}</td><td>{{ m.sold }}</td></tr>{% else %}<tr><td colspan="4"><div class="empty">Sem dados ainda.</div></td></tr>{% endfor %}
+</tbody></table></div></section>
+</div>
+{% endblock %}

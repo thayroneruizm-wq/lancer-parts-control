@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><span class="overline">PRODUÇÃO / NOVO LOTE</span><h1>Iniciar produção</h1><p>Registre quantos coletores entraram em fabricação.</p></div><a class="btn btn-ghost" href="/production">← Voltar</a></div>
+<form method="post" class="panel form-card stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="form-grid">
+<label>Produto *<select name="product" required>{% for p in products %}<option value="{{ p }}">{{ p }}</option>{% endfor %}</select></label>
+<label>Quantidade *<input type="number" name="quantity" min="1" max="10000" value="1" required></label>
+<label>Modelo do veículo<select name="vehicle_model"><option value="">Não informado</option>{% for v in vehicles %}<option value="{{ v }}">{{ v }}</option>{% endfor %}</select></label>
+<label>Código do lote<input name="batch_code" maxlength="60" placeholder="Ex.: CD-2026-01"></label>
+<label class="span-2">Observações<textarea name="notes" rows="3" placeholder="Material, solda, acabamento, responsável..."></textarea></label>
+</div><div class="form-actions"><a class="btn btn-ghost" href="/production">Cancelar</a><button class="btn btn-primary">⚙ Iniciar produção</button></div></form>
+{% endblock %}

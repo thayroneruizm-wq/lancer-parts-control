@@ -38,13 +38,17 @@ SHIPPING = ('Não enviado','Etiqueta pendente','Aguardando coleta','Em trânsito
 PRIORITIES = ('Baixa','Média','Alta','Urgente')
 CATEGORIES = ('Retomar orçamento','Promoção','Estoque','Aguardar pagamento','Retorno futuro','Sem resposta','Outro')
 VEHICLES = ('Lancer GT','Lancer CVT','Lancer MT','Lancer HL','Lancer HLE','Lancer HL-T','Ralliart','Evolution X','Outro')
+PRODUCTION_STATES = ('Em produção','Finalizado','Vendido')
+PRODUCTION_NEXT = {'Em produção':'Finalizado','Finalizado':'Vendido'}
+PRODUCTION_ROLES = ('admin','gerente','estoque','vendedor','logistica')
+PRODUCTS = ('Coletor Cat Delete',)
 LOSS_REASONS = ('','Preço','Frete','Prazo','Falta de estoque','Desistência','Concorrência','Outro')
 NAV = [
  ('dashboard','Dashboard','layout-dashboard','/'),('clients','CRM / Clientes','users','/clients'),
  ('pipeline','Funil de Vendas','columns-3','/opportunities'),('followups','Follow-ups','alarm-clock','/followups'),
  ('whatsapp','WhatsApp / Atendimento','message-circle','/modules/whatsapp'),
  ('orders','Pedidos','package','/orders'),('logistics','Logística / Rastreamento','truck','/modules/logistics'),
- ('stock','Estoque e Produtos','boxes','/modules/stock'),('production','Produção','wrench','/modules/production'),
+ ('stock','Estoque e Produtos','boxes','/modules/stock'),('production','Produção','wrench','/production'),
  ('finance','Financeiro','wallet','/modules/finance'),('marketing','Marketing / Campanhas','megaphone','/modules/marketing'),
  ('after-sales','Pós-venda','heart-handshake','/modules/after-sales'),('tasks','Tarefas / Planejamento','check-square','/tasks'),
  ('reports','Relatórios','chart-no-axes-column','/reports'),('insights','Insights Lancer Parts','lightbulb','/modules/insights'),
@@ -113,6 +117,10 @@ def fmt_date(s):
     except ValueError:return s
 
 def fmt_phone(s): return digits(s)
+def wa_link(s):
+    d=digits(s)
+    if not d:return ''
+    return 'https://wa.me/'+('55'+d if len(d) in (10,11) else d)
 def qone(c,sql,args=()):return c.execute(sql,args).fetchone()
 def qall(c,sql,args=()):return c.execute(sql,args).fetchall()
 def record(row):return dict(row) if row else None
@@ -202,7 +210,7 @@ def render(request, template, **kwargs):
     user=current_user(request)
     if not user and template!='login.html':return redirect('/login')
     ctx = dict(request=request,user=user,nav=NAV,csrf=csrf(request),fmt_money=fmt_money,fmt_date=fmt_date,
-      fmt_phone=fmt_phone,stages=STAGES,operations=OPERATIONS,payments=PAYMENTS,shipping_states=SHIPPING,
+      fmt_phone=fmt_phone,wa_link=wa_link,stages=STAGES,operations=OPERATIONS,payments=PAYMENTS,shipping_states=SHIPPING,
       priorities=PRIORITIES,vehicles=VEHICLES,categories=CATEGORIES,loss_reasons=LOSS_REASONS,
       now=now(), success=request.query_params.get('success'), error=request.query_params.get('error'))
     ctx.update(kwargs)
@@ -300,7 +308,8 @@ async def save_client(request, client_id=None):
     name=val(data,'name',150)
     if len(name)<2:return redirect(request.url.path+'?error=Informe um nome válido')
     phone=val(data,'phone',30); normalized=phone_key(phone)
-    if normalized and len(normalized)<10:return redirect(request.url.path+'?error=Telefone inválido')
+    if not normalized:return redirect(request.url.path+'?error='+quote('Informe o número de WhatsApp do cliente'))
+    if len(normalized)<10 or len(normalized)>13:return redirect(request.url.path+'?error='+quote('WhatsApp inválido. Use DDD + número, ex.: (62) 99999-9999'))
     fields=['name','phone','email','document','city','state','address','vehicle_model','modifications','interests','notes','tags','origin']
     values={f:val(data,f,3000 if f in ['notes','modifications','interests'] else 255) for f in fields}
     values['name']=name;values['phone_normalized']=normalized or None
@@ -726,11 +735,99 @@ def settings(request:Request):
     u=require(request,('admin','gerente'))
     return render(request,'settings.html',section='settings',db_location='instance/lancer_parts.db')
 
+def production_clients(c,u):
+    sql="SELECT id,name,phone FROM clients WHERE archived=0"+(' AND owner_id=?' if u['role']=='vendedor' else '')+' ORDER BY name LIMIT 500'
+    return qall(c,sql,([u['id']] if u['role']=='vendedor' else []))
+
+@app.get('/production')
+def production(request:Request,status:str='',product:str=''):
+    u=require(request,PRODUCTION_ROLES+('financeiro',))
+    filters=['1=1'];args=[]
+    if status in PRODUCTION_STATES:filters.append('p.status=?');args.append(status)
+    if product:filters.append('p.product=?');args.append(product[:120])
+    where=' AND '.join(filters)
+    with db() as c:
+        totals={s:0 for s in PRODUCTION_STATES}
+        sargs=[product[:120]] if product else []
+        for r in qall(c,'SELECT status,COALESCE(SUM(quantity),0) n FROM production_batches'+(' WHERE product=?' if product else '')+' GROUP BY status',sargs):
+            totals[r['status']]=r['n']
+        month=now().date().replace(day=1).isoformat()
+        month_done=qone(c,"SELECT COALESCE(SUM(quantity),0) n FROM production_batches WHERE status IN ('Finalizado','Vendido') AND substr(finished_at,1,10)>=?"+(' AND product=?' if product else ''),(month,*sargs))['n']
+        month_sold=qone(c,"SELECT COALESCE(SUM(quantity),0) n FROM production_batches WHERE status='Vendido' AND substr(sold_at,1,10)>=?"+(' AND product=?' if product else ''),(month,*sargs))['n']
+        by_model=qall(c,"SELECT COALESCE(NULLIF(vehicle_model,''),'Não informado') model,SUM(CASE WHEN status='Em produção' THEN quantity ELSE 0 END) prod,SUM(CASE WHEN status='Finalizado' THEN quantity ELSE 0 END) done,SUM(CASE WHEN status='Vendido' THEN quantity ELSE 0 END) sold FROM production_batches"+(' WHERE product=?' if product else '')+" GROUP BY model ORDER BY model",sargs)
+        rows=qall(c,'SELECT p.*,cl.name client_name,cl.phone client_phone,us.name owner FROM production_batches p LEFT JOIN clients cl ON cl.id=p.client_id LEFT JOIN users us ON us.id=p.owner_id WHERE '+where+" ORDER BY CASE p.status WHEN 'Em produção' THEN 0 WHEN 'Finalizado' THEN 1 ELSE 2 END, p.updated_at DESC LIMIT 300",args)
+        products=[r['product'] for r in qall(c,'SELECT DISTINCT product FROM production_batches ORDER BY product')]
+        clients_list=production_clients(c,u) if u['role'] in PRODUCTION_ROLES else []
+    return render(request,'production.html',section='production',title='Produção',rows=rows,totals=totals,status=status,product=product,
+        products=sorted(set(products)|set(PRODUCTS)),month_done=month_done,month_sold=month_sold,by_model=by_model,clients_list=clients_list,
+        production_states=PRODUCTION_STATES,can_edit=u['role'] in PRODUCTION_ROLES)
+
+@app.get('/production/new')
+def production_new(request:Request):
+    u=require(request,PRODUCTION_ROLES)
+    return render(request,'production_form.html',section='production',title='Nova produção',products=PRODUCTS)
+
+@app.post('/production/new')
+async def production_create(request:Request):
+    u=require(request,PRODUCTION_ROLES);data=await request.form();validate_csrf(request,data)
+    product=val(data,'product',120) or PRODUCTS[0]
+    qty=intval(data.get('quantity'))
+    if not 1<=qty<=10000:return redirect('/production/new?error='+quote('Quantidade deve estar entre 1 e 10.000'))
+    model=val(data,'vehicle_model',60)
+    if model and model not in VEHICLES:model=''
+    values=dict(product=product,vehicle_model=model or None,batch_code=val(data,'batch_code',60) or None,quantity=qty,
+        status='Em produção',owner_id=u['id'],notes=val(data,'notes',2000) or None,started_at=iso_now())
+    with db() as c:
+        cur=c.execute(f'INSERT INTO production_batches ({",".join(values)}) VALUES ({",".join("?" for _ in values)})',list(values.values()))
+        audit(c,u,'production_batches',cur.lastrowid,'create',None,values)
+    return redirect('/production?success='+quote(f'{qty} unidade(s) de {product} em produção'))
+
+@app.post('/production/{pid}/advance')
+async def production_advance(request:Request,pid:int):
+    u=require(request,PRODUCTION_ROLES);data=await request.form();validate_csrf(request,data)
+    with db() as c:
+        batch=record(qone(c,'SELECT * FROM production_batches WHERE id=?',(pid,)))
+        if not batch:raise HTTPException(404,'Lote não encontrado')
+        nxt=PRODUCTION_NEXT.get(batch['status'])
+        if not nxt:return redirect('/production?error='+quote('Este lote já foi vendido'))
+        qty=intval(data.get('quantity'),batch['quantity'])
+        if not 1<=qty<=batch['quantity']:return redirect('/production?error='+quote(f'Quantidade deve estar entre 1 e {batch["quantity"]}'))
+        client_id=None
+        if nxt=='Vendido':
+            client_id=intval(data.get('client_id')) or None
+            if client_id:
+                if u['role'] in SALES:client_allowed(c,u,client_id)
+                elif not qone(c,'SELECT id FROM clients WHERE id=? AND archived=0',(client_id,)):raise HTTPException(404,'Cliente não encontrado.')
+        stamp=iso_now()
+        changes={'status':nxt,'updated_at':stamp}
+        if nxt=='Finalizado':changes['finished_at']=stamp
+        else:changes.update(sold_at=stamp,client_id=client_id)
+        if qty<batch['quantity']:
+            c.execute('UPDATE production_batches SET quantity=?,updated_at=? WHERE id=?',(batch['quantity']-qty,stamp,pid))
+            new=dict(batch);new.pop('id');new.pop('created_at');new.update(changes);new['quantity']=qty
+            cur=c.execute(f'INSERT INTO production_batches ({",".join(new)}) VALUES ({",".join("?" for _ in new)})',list(new.values()))
+            audit(c,u,'production_batches',cur.lastrowid,'split',{'from':pid},new)
+        else:
+            c.execute(f'UPDATE production_batches SET {",".join(k+"=?" for k in changes)} WHERE id=?',(*changes.values(),pid))
+            audit(c,u,'production_batches',pid,'status_change',{'status':batch['status']},changes)
+        if client_id:activity(c,u,client_id,'Venda produção',f'{qty}x {batch["product"]} vendido(s)')
+    label='finalizada(s)' if nxt=='Finalizado' else 'vendida(s)'
+    return redirect('/production?success='+quote(f'{qty} unidade(s) {label}'))
+
+@app.post('/production/{pid}/delete')
+async def production_delete(request:Request,pid:int):
+    u=require(request,('admin','gerente'));data=await request.form();validate_csrf(request,data)
+    with db() as c:
+        batch=record(qone(c,'SELECT * FROM production_batches WHERE id=?',(pid,)))
+        if not batch:raise HTTPException(404,'Lote não encontrado')
+        c.execute('DELETE FROM production_batches WHERE id=?',(pid,))
+        audit(c,u,'production_batches',pid,'delete',batch,None)
+    return redirect('/production?success=Registro removido')
+
 MODULES={
  'whatsapp':('WhatsApp / Atendimento','Conectar a API oficial da Meta ou provedor aprovado, com webhooks assinados, caixa de entrada e atribuição.'),
  'logistics':('Logística / Rastreamento','Conectar rastreamento oficial, eventos de transportadoras e fluxo operacional de expedição.'),
  'stock':('Estoque e Produtos','Produtos, SKUs, reservas, movimentos e sincronização a partir da Nuvemshop.'),
- 'production':('Produção','Ordens de fabricação, etapas, responsáveis e controle de prazo para peças sob encomenda.'),
  'finance':('Financeiro','Margens apenas com custos reais, contas a pagar e a receber, taxas e conciliação.'),
  'marketing':('Marketing / Campanhas','Campanhas, listas segmentadas e mensuração com consentimento de contato.'),
  'after-sales':('Pós-venda','Rotinas de satisfação, garantia, devoluções e relacionamento pós-entrega.'),

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}{% block content %}
 <div class="page-head"><div><span class="overline">CRM / {{ 'EDIÇÃO' if is_edit else 'NOVO REGISTRO' }}</span><h1>{{ 'Editar cliente' if is_edit else 'Novo cliente' }}</h1><p>Dados comerciais, veículo, responsável e informações de contato.</p></div><a class="btn btn-ghost" href="{{ '/clients/' ~ item.id if is_edit else '/clients' }}">← Voltar</a></div>
 <form method="post" class="panel form-card stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><div class="form-note">Os dados são armazenados localmente. Um cliente com o mesmo telefone ou CPF/CNPJ não será cadastrado novamente.</div><div class="form-grid">
-<label>Nome completo *<input name="name" required maxlength="150" value="{{ item.name or '' }}" placeholder="Nome do cliente"></label><label>Telefone / WhatsApp<input name="phone" value="{{ item.phone or '' }}" placeholder="(62) 99999-9999"></label>
+<label>Nome completo *<input name="name" required maxlength="150" value="{{ item.name or '' }}" placeholder="Nome do cliente"></label><label>WhatsApp *<input name="phone" type="tel" inputmode="tel" required pattern="[0-9()+\-\s]{10,20}" title="DDD + número, ex.: (62) 99999-9999" value="{{ item.phone or '' }}" placeholder="(62) 99999-9999"></label>
 <label>E-mail<input name="email" type="email" value="{{ item.email or '' }}"></label><label>CPF/CNPJ (quando necessário)<input name="document" value="{{ item.document or '' }}"></label>
 <label>Cidade<input name="city" value="{{ item.city or '' }}"></label><label>Estado<input name="state" maxlength="2" value="{{ item.state or '' }}" placeholder="GO"></label>
 <label class="span-2">Endereço de entrega<textarea name="address" rows="2">{{ item.address or '' }}</textarea></label>
