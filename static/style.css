@@ -7,11 +7,11 @@
 .panel + .panel{margin-top:16px}.integration-grid + .notice{margin-top:18px}.quick-grid + .notice{margin:0 19px 19px}.stat-number.long{font-size:18px}
 
 /* Lancer Parts logo: crop the square artwork to the wordmark bounding box */
-.logo-crop{display:block;overflow:hidden;aspect-ratio:300/220;flex-shrink:0}
-.logo-crop img{display:block;width:166.7%;max-width:none;margin:-45% 0 0 -33.3%}
+
+
 .brand-logo{display:flex;align-items:center;gap:10px}
-.logo-sidebar{width:96px}
-.logo-login{width:170px;margin-bottom:10px}
+.logo-sidebar{display:block;width:auto;height:46px;flex-shrink:0}
+.logo-login{display:block;width:180px;height:auto;margin-bottom:14px}
 .login-brand{letter-spacing:normal}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .wa-link{display:block;color:#83d8b0;font-size:12px;font-weight:700;text-decoration:none;margin-top:2px}
