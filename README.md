@@ -15,6 +15,13 @@ CRM + pedidos manuais + follow-ups + funil de vendas + tarefas + dashboard. Dese
 - Tarefas internas vinculáveis a cliente/pedido, responsáveis e conclusão; busca global em registros existentes.
 - Dashboard com indicadores derivados de pedidos manuais **aprovados**, sem contar cancelados; notificações de follow-ups vencidos e pedidos com prazo ultrapassado.
 - Relatórios com CSV (UTF-8 BOM, separador `;`) e mitigação de injeção de fórmulas.
+- **Produção (v0.3):** lotes com quantidade planejada, apontamento de unidades finalizadas (com correção negativa e histórico), status do lote e painel com *em produção / finalizadas / vendidas / em estoque* por produto. *Vendidas* = itens de pedidos com pagamento **Aprovado** e não cancelados/devolvidos, ligados ao produto por nome ou SKU.
+- **WhatsApp nos clientes (v0.3):** botão WhatsApp (wa.me, abertura manual) na lista e na ficha do cliente, em follow-ups e pedidos, com mensagem inicial; número da loja configurável em Configurações.
+- **Logo Lancer Parts** no menu, login, favicon e rodapé (`static/logo.png`).
+- **Dashboard operacional (v0.4):** sem faturamento. Mostra avisos críticos/atenção, follow-ups e tarefas do dia, pedidos a enviar/em trânsito, cronograma dos próximos dias e o **Controle de pedidos em aberto**.
+- **Controle de Pedidos (`/controle-pedidos`):** cada compra com checklist (Pago · Preparado · Embalado · Rastreio · Enviado · Entregue · Cliente avisado), filtros por etapa, atrasos/ocorrências e ações rápidas (marcar embalado, enviado com rastreio, entregue, cliente avisado) com histórico e botão WhatsApp com mensagem pronta.
+- **Agenda e Avisos (`/agenda`):** central de avisos por urgência (crítico/atenção/lembrete) e cronograma por dia (atrasados, hoje, amanhã, semana, 30 dias). Fontes: follow-ups, tarefas, prazos de pedidos e de lotes de produção. Contador de avisos no topo de todas as telas.
+- **Tarefas recorrentes:** diária, semanal, quinzenal ou mensal; ao concluir, a próxima ocorrência é criada automaticamente.
 - Menus das áreas futuras exibem explicitamente **NÃO IMPLEMENTADO**. Central de integrações mostra **Desconectado**, nunca conectado artificialmente.
 
 ## Repositório público e implantação
