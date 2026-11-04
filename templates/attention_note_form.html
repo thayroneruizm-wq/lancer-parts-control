@@ -12,7 +12,7 @@
 <div class="form-actions"><a href="/agenda" class="btn">Cancelar</a><button class="btn btn-primary">{{ 'Salvar alterações' if is_edit else 'Adicionar ao Dashboard' }}</button></div>
 </form>
 {% if is_edit %}
-<section class="panel" style="margin-top:16px"><div class="panel-heading"><h2>Gerenciar aviso</h2><small>Concluir ou excluir apenas este aviso manual</small></div><div class="status-actions" style="padding:15px">
+<section class="panel notice-management"><div class="panel-heading"><h2>Gerenciar aviso</h2><small>Concluir ou excluir apenas este aviso manual</small></div><div class="status-actions notice-management-actions">
 <form method="post" action="/alerts/{{ item.id }}/complete"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">✓ Marcar como concluído</button></form>
 {% if user.role in ['admin','gerente'] or item.created_by==user.id %}
 <form method="post" action="/alerts/{{ item.id }}/delete" data-confirm="Excluir permanentemente este aviso manual?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-danger-soft">Excluir aviso</button></form>
