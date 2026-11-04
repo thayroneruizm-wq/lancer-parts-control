@@ -658,8 +658,6 @@ async def alert_delete(request:Request,aid:int):
     u=require(request);data=await request.form();validate_csrf(request,data)
     with db() as c:
         old=attention_allowed(c,u,aid)
-        if u['role'] not in ('admin','gerente') and old['created_by']!=u['id']:
-            raise HTTPException(403,'Somente o autor ou gestor pode excluir este aviso.')
         audit(c,u,'attention_notes',aid,'delete',record(old),None)
         c.execute('DELETE FROM attention_notes WHERE id=?',(aid,))
         c.execute('DELETE FROM alert_dismissals WHERE alert_key=?',(f'note:{aid}',))
