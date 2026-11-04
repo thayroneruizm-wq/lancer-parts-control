@@ -53,3 +53,14 @@ progress::-webkit-progress-bar{background:#262932}progress::-webkit-progress-val
 .alert-bell.has{border-color:#70434a;color:#ffb2b7}.alert-bell.has b{background:var(--red)}
 @media(max-width:1250px){.quick-grid-4{grid-template-columns:repeat(2,1fr)}.stats-3{grid-template-columns:1fr 1fr}}
 @media(max-width:660px){.alert-bell{padding:6px 8px}.alert-bell{font-size:0}.alert-bell b{font-size:11px}.quick-grid-4,.stats-3{grid-template-columns:1fr}}
+
+/* Avisos administráveis no Dashboard e na Agenda. */
+.attention-manageable{gap:11px;flex-wrap:wrap}
+.attention-manageable .attention-info{flex:1 1 240px;min-width:0}
+.attention-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.attention-actions form,.attention-inline{margin:0;display:inline-flex}
+.btn-danger-soft{background:rgba(231,65,76,.08);border-color:#65333c;color:#ff9ea5}
+.btn-danger-soft:hover{background:rgba(231,65,76,.17);border-color:#a44754;color:white}
+.notice-management{margin-top:16px}
+.notice-management-actions{padding:15px}
+@media(max-width:720px){.attention-actions{margin-left:0;width:100%}.attention-manageable .pill{margin-left:auto}}
