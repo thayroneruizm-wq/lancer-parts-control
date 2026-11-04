@@ -8,4 +8,28 @@
 {% endif %}
 {% set phone=r.client_phone or r.phone %}{% if phone %}{% if ctl.sent %}{% set txt='Olá! Aqui é da Lancer Parts. Seu pedido #'~r.order_number~' foi enviado.'~((' Código de rastreio: '~r.tracking_code) if r.tracking_code else '') %}{% else %}{% set txt='Olá! Aqui é da Lancer Parts, sobre o seu pedido #'~r.order_number~'.' %}{% endif %}{% set w=wa_text(phone,txt) %}{% if w %}<a class="btn btn-wa btn-sm" href="{{ w }}" target="_blank" rel="noopener noreferrer">WhatsApp</a>{% endif %}{% endif %}
 </div>{% endmacro %}
-{% macro alert_row(a) %}<div class="attention-row"><div class="attention-type">{{ a.icon }}</div><div class="attention-info"><b>{{ a.title }}</b><small>{{ a.detail }}</small></div><span class="pill {{ a.css }}">{{ a.label }}</span><a class="attention-link" href="{{ a.url }}">Abrir ↗</a></div>{% endmacro %}
+{% macro alert_row(a) %}
+<div class="attention-row attention-manageable">
+ <div class="attention-type">{{ a.icon }}</div>
+ <div class="attention-info"><b>{{ a.title }}</b><small>{{ a.kind }} · {{ a.detail }}</small></div>
+ <span class="pill {{ a.css }}">{{ a.label }}</span>
+ <div class="attention-actions">
+  <a class="attention-link" href="{{ a.url }}">{{ 'Editar' if a.kind=='Manual' else 'Abrir' }} ↗</a>
+  {% if a.kind=='Manual' %}
+  <form method="post" action="/alerts/{{ a.key.split(':')[1] }}/complete" class="attention-inline">
+   <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm" title="Concluir aviso">Concluir</button>
+  </form>
+  <form method="post" action="/alerts/{{ a.key.split(':')[1] }}/delete" class="attention-inline" data-confirm="Excluir permanentemente este aviso manual?">
+   <input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-sm btn-danger-soft" title="Excluir aviso manual">Excluir</button>
+  </form>
+  {% else %}
+  <form method="post" action="/alerts/dismiss" class="attention-inline">
+   <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="key" value="{{ a.key }}">
+   <input type="hidden" name="next" value="{{ request.url.path }}">
+   <button class="btn btn-sm" title="Ocultar apenas o aviso, sem excluir o registro original">Dispensar</button>
+  </form>
+  {% endif %}
+ </div>
+</div>
+{% endmacro %}
+
