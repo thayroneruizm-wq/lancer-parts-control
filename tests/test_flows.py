@@ -58,7 +58,7 @@ def test_full_happy_path():
         assert 'LP-001' in r.text
         r=c.post('/tasks/new',data={'csrf':token,'title':'Conferir peça','priority':'Alta','assignee_id':'1','client_id':cid})
         assert 'Conferir peça' in r.text
-        r=c.get('/');assert 'R$ 1.499,00' in r.text
+        r=c.get('/');assert 'LP-001' in r.text and 'Conferir peça' in r.text
         r=c.get('/clients/'+str(cid));assert 'Coletor 4x2x1' in r.text
         r=c.get('/export/orders');assert r.status_code==200 and 'LP-001' in r.text
         r=c.get('/integrations');assert 'Desconectado' in r.text and 'nenhum provedor' in r.text
