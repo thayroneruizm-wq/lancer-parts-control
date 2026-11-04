@@ -88,3 +88,26 @@ CREATE TABLE IF NOT EXISTS production_logs (
  qty INTEGER NOT NULL, note TEXT, user_id INTEGER REFERENCES users(id),
  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Avisos manuais, com responsável, conclusão e trilha de auditoria.
+CREATE TABLE IF NOT EXISTS attention_notes (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,
+ title TEXT NOT NULL,
+ detail TEXT,
+ due_at TEXT,
+ priority TEXT NOT NULL DEFAULT 'Média',
+ assignee_id INTEGER REFERENCES users(id),
+ created_by INTEGER REFERENCES users(id),
+ status TEXT NOT NULL DEFAULT 'Pendente' CHECK(status IN ('Pendente','Concluído')),
+ created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_attention_notes_pending ON attention_notes(status,due_at);
+-- Dispensar é por usuário e versão; nunca apaga o pedido/tarefa/follow-up de origem.
+CREATE TABLE IF NOT EXISTS alert_dismissals (
+ user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ alert_key TEXT NOT NULL,
+ source_version TEXT NOT NULL,
+ dismissed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ PRIMARY KEY(user_id,alert_key)
+);

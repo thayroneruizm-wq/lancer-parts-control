@@ -1,0 +1,22 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><span class="overline">DASHBOARD / O QUE PRECISA DA MINHA ATENÇÃO</span><h1>{{ 'Editar aviso' if is_edit else 'Novo aviso de atenção' }}</h1><p>Registre uma pendência que deve aparecer no Dashboard, inclusive sem prazo.</p></div><a class="btn" href="/agenda">← Voltar</a></div>
+<form method="post" action="{{ '/alerts/'~item.id~'/edit' if is_edit else '/alerts/new' }}" class="panel form-card stack-form">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<div class="form-grid">
+ <label class="span-2">O que precisa de atenção? *<input name="title" required maxlength="180" value="{{ item.title or '' }}" placeholder="Ex.: Conferir entrega urgente"></label>
+ <label>Prioridade<select name="priority">{% for p in priorities %}<option value="{{ p }}" {{ 'selected' if (item.priority or 'Média')==p else '' }}>{{ p }}</option>{% endfor %}</select></label>
+ <label>Prazo (opcional)<input type="datetime-local" name="due_at" value="{{ (item.due_at or '')[:16] }}"></label>
+ {% if users %}<label class="span-2">Responsável<select name="assignee_id">{% for u in users %}<option value="{{ u.id }}" {{ 'selected' if (item.assignee_id or user.id)==u.id else '' }}>{{ u.name }}</option>{% endfor %}</select></label>{% endif %}
+ <label class="span-2">Observações<textarea name="detail" rows="5" maxlength="2000" placeholder="Detalhes e próximos passos">{{ item.detail or '' }}</textarea></label>
+</div>
+<div class="form-actions"><a href="/agenda" class="btn">Cancelar</a><button class="btn btn-primary">{{ 'Salvar alterações' if is_edit else 'Adicionar ao Dashboard' }}</button></div>
+</form>
+{% if is_edit %}
+<section class="panel notice-management"><div class="panel-heading"><h2>Gerenciar aviso</h2><small>Concluir ou excluir apenas este aviso manual</small></div><div class="status-actions notice-management-actions">
+<form method="post" action="/alerts/{{ item.id }}/complete"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn">✓ Marcar como concluído</button></form>
+{% if user.role in ['admin','gerente'] or item.created_by==user.id %}
+<form method="post" action="/alerts/{{ item.id }}/delete" data-confirm="Excluir permanentemente este aviso manual?"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-danger-soft">Excluir aviso</button></form>
+{% endif %}
+</div></section>
+{% endif %}
+{% endblock %}

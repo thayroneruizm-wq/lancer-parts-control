@@ -236,7 +236,7 @@ def render(request, template, **kwargs):
     with db() as _c:
         store_wa=get_setting(_c,'store_whatsapp')
         if user:
-            try:alerts_count=sum(1 for a in build_alerts(_c,user) if a['level']<=1)
+            try:alerts_count=len(build_alerts(_c,user))
             except sqlite3.Error:alerts_count=0
     ctx = dict(request=request,user=user,nav=NAV,store_whatsapp=store_wa,store_whatsapp_fmt=fmt_br_phone(store_wa),
       wa=lambda phone,name='':wa_link(phone,wa_greeting(name,store_wa)),wa_text=wa_link,alerts_count=alerts_count,recurrences=RECURRENCES,csrf=csrf(request),fmt_money=fmt_money,fmt_date=fmt_date,
@@ -361,48 +361,107 @@ def control_rows(c,u,limit=600):
         d=dict(r);d['ctl']=order_control(d);rows.append(d)
     return rows
 
-def build_alerts(c,u):
-    """Avisos priorizados: 0 = crítico, 1 = atenção, 2 = lembrete."""
-    ref=now();end_today=ref.strftime('%Y-%m-%dT23:59');out=[];role=u['role']
-    def add(level,kind,icon,title,detail,url,when=None):
-        out.append(dict(level=level,kind=kind,icon=icon,title=title,detail=detail,url=url,when=when,label=LEVELS[level][0],css=LEVELS[level][1]))
+def build_alerts(c,u,include_dismissed=False):
+    """Pendências reais por prioridade. Dispensar não apaga os registros de origem."""
+    ref=now();out=[];role=u['role']
+    dismissed={r['alert_key']:r['source_version'] for r in qall(
+        c,'SELECT alert_key,source_version FROM alert_dismissals WHERE user_id=?',(u['id'],))}
+
+    def add(level,kind,icon,title,detail,url,key,version,when=None):
+        signature=hashlib.sha256(json.dumps(version,ensure_ascii=False,default=str,sort_keys=True).encode()).hexdigest()[:32]
+        if not include_dismissed and dismissed.get(key)==signature:return
+        out.append(dict(level=level,kind=kind,icon=icon,title=title,detail=detail,url=url,
+                        when=when,label=LEVELS[level][0],css=LEVELS[level][1],
+                        key=key,signature=signature))
+
     if role in SALES:
         scope=' AND f.owner_id=?' if role=='vendedor' else ''
-        for f in qall(c,"SELECT f.*,cl.name client_name FROM followups f JOIN clients cl ON cl.id=f.client_id WHERE f.status='Pendente' AND cl.archived=0 AND f.due_at<=?"+scope+" ORDER BY f.due_at LIMIT 100",(end_today,*([u['id']] if scope else []))):
+        for f in qall(c,"SELECT f.*,cl.name client_name FROM followups f JOIN clients cl ON cl.id=f.client_id WHERE f.status='Pendente' AND cl.archived=0"+scope+" ORDER BY f.due_at LIMIT 250",([u['id']] if scope else [])):
             due=parse_dt(f['due_at'])
             if not due:continue
             late=ref-due;over=late.total_seconds()>0;high=f['priority'] in ('Alta','Urgente')
-            level=(0 if (late.days>=1 or high) else 1) if over else 2
+            level=(0 if over and (late.days>=1 or high) else
+                   1 if due.date()<=ref.date() or high else 2)
+            timing=(f'Atrasado há {human_delta(late)}' if over else
+                    f'Hoje às {due:%H:%M}' if due.date()==ref.date() else
+                    f'Programado para {due:%d/%m/%Y %H:%M}')
             add(level,'Follow-up','◷',f"Retornar para {f['client_name']} · {f['product']}",
-                (f'Atrasado há {human_delta(late)}' if over else f'Hoje às {due:%H:%M}')+f" · prioridade {f['priority']}",f"/followups/{f['id']}/edit",due)
+                f"{timing} · prioridade {f['priority']}",f"/followups/{f['id']}/edit",
+                f"followup:{f['id']}",[f['updated_at'],f['due_at'],f['status'],f['priority'],f['product'],f['owner_id']],due)
+
     scope='' if role in ('admin','gerente') else ' AND t.assignee_id=?'
-    for t in qall(c,"SELECT t.* FROM tasks t WHERE t.status='Pendente' AND t.due_at IS NOT NULL AND t.due_at<=?"+scope+" ORDER BY t.due_at LIMIT 100",(end_today,*([u['id']] if scope else []))):
-        due=parse_dt(t['due_at'])
-        if not due:continue
-        late=ref-due;over=late.total_seconds()>0;high=t['priority'] in ('Alta','Urgente')
-        level=(0 if (late.days>=1 or high) else 1) if over else (1 if high else 2)
-        add(level,'Tarefa','☑',t['title'],(f'Atrasada há {human_delta(late)}' if over else f'Hoje às {due:%H:%M}')+f" · prioridade {t['priority']}",'/tasks',due)
+    for t in qall(c,"SELECT t.* FROM tasks t WHERE t.status='Pendente'"+scope+" ORDER BY t.due_at LIMIT 250",([u['id']] if scope else [])):
+        due=parse_dt(t['due_at']);high=t['priority'] in ('Alta','Urgente')
+        over=bool(due and due<ref)
+        level=(0 if over and ((ref-due).days>=1 or high) else
+               1 if (due and due.date()<=ref.date()) or high else 2)
+        timing=('Sem prazo definido' if not due else
+                f'Atrasada há {human_delta(ref-due)}' if over else
+                f'Hoje às {due:%H:%M}' if due.date()==ref.date() else
+                f'Programada para {due:%d/%m/%Y %H:%M}')
+        add(level,'Tarefa','☑',t['title'],f"{timing} · prioridade {t['priority']}",
+            '/tasks',f"task:{t['id']}",
+            [t['updated_at'],t['due_at'],t['status'],t['priority'],t['title'],t['assignee_id']],due)
+
     if role in OPS:
         for o in control_rows(c,u):
             ctl=o['ctl']
             if ctl['closed']:continue
             num=o['order_number'];url=f"/orders/{o['id']}";who=o['client_name']
-            if ctl['problem']:add(0,'Pedido','▤',f'Ocorrência logística no pedido #{num}',f'{who} · confira a transportadora e avise o cliente',url)
-            if ctl['overdue']:add(0,'Pedido','▤',f'Prazo do pedido #{num} vencido',f"{who} · venceu há {human_delta(now()-ctl['due'])} · etapa: {ctl['stage']}",url,ctl['due'])
+            common=[o['updated_at'],o['payment_status'],o['operational_status'],o['shipping_status'],
+                    o['due_at'],o['tracking_code'],o['packed'],o['customer_notified']]
+            flagged=False
+            def order_add(code,level,title,detail,when=None):
+                nonlocal flagged
+                flagged=True
+                add(level,'Pedido','▤',title,detail,url,f"order:{o['id']}:{code}",common,when)
+            if ctl['problem']:
+                order_add('occurrence',0,f'Ocorrência logística no pedido #{num}',f'{who} · confira a transportadora e avise o cliente')
+            if ctl['overdue']:
+                order_add('overdue',0,f'Prazo do pedido #{num} vencido',
+                          f"{who} · venceu há {human_delta(ref-ctl['due'])} · etapa: {ctl['stage']}",ctl['due'])
             elif ctl['due'] and not ctl['sent'] and ctl['due']-ref<=timedelta(hours=48):
-                add(1,'Pedido','▤',f'Pedido #{num} vence em {human_delta(ctl["due"]-ref)}',f"{who} · etapa: {ctl['stage']}",url,ctl['due'])
+                order_add('due',1,f'Pedido #{num} vence em {human_delta(ctl["due"]-ref)}',
+                          f"{who} · etapa: {ctl['stage']}",ctl['due'])
             if ctl['paid'] and not ctl['sent'] and ctl['age_days']>=2:
-                add(0 if ctl['age_days']>=5 else 1,'Pedido','▤',f'Pedido #{num} pago e ainda não enviado',f"{who} · criado há {ctl['age_days']} dias · etapa: {ctl['stage']}",url)
+                order_add('ship_late',0 if ctl['age_days']>=5 else 1,f'Pedido #{num} pago e ainda não enviado',
+                          f"{who} · criado há {ctl['age_days']} dias · etapa: {ctl['stage']}")
             if ctl['stage']=='Aguardando pagamento' and ctl['age_days']>=3:
-                add(1,'Pedido','▤',f'Pedido #{num} aguardando pagamento há {ctl["age_days"]} dias',f'{who} · cobrar o cliente ou cancelar',url)
-            if ctl['sent'] and not ctl['tracking']:add(1,'Pedido','▤',f'Pedido #{num} enviado sem código de rastreio',f'{who} · cadastre o rastreio no pedido',url)
-            elif ctl['sent'] and not ctl['notified']:add(2,'Pedido','▤',f'Avise {who} sobre o envio do pedido #{num}','Marque “Cliente avisado” depois do contato',url)
+                order_add('payment_late',1,f'Pedido #{num} aguardando pagamento há {ctl["age_days"]} dias',
+                          f'{who} · cobrar o cliente ou cancelar')
+            if ctl['sent'] and not ctl['tracking']:
+                order_add('tracking',1,f'Pedido #{num} enviado sem código de rastreio',
+                          f'{who} · cadastre o rastreio no pedido')
+            elif ctl['sent'] and not ctl['notified']:
+                order_add('notify',2,f'Avise {who} sobre o envio do pedido #{num}',
+                          'Marque “Cliente avisado” depois do contato')
+            if not flagged:
+                order_add('pending',2,f'Pedido #{num} · {ctl["stage"]}',
+                          f'{who} · pedido em andamento, acompanhe a próxima etapa',ctl['due'])
+
     if role in PROD_VIEW:
-        for b in qall(c,"SELECT b.*,p.name product FROM production_batches b JOIN products p ON p.id=b.product_id WHERE b.status IN ('Planejado','Em produção') AND b.due_at IS NOT NULL"):
+        for b in qall(c,"SELECT b.*,p.name product FROM production_batches b JOIN products p ON p.id=b.product_id WHERE b.status IN ('Planejado','Em produção') ORDER BY b.due_at LIMIT 250"):
             due=parse_dt(b['due_at'])
-            if not due:continue
-            if due<ref:add(0,'Produção','⚙',f"Lote {b['code']} atrasado",f"{b['product']} · {b['qty_finished']}/{b['qty_planned']} finalizadas · venceu há {human_delta(ref-due)}",f"/production/{b['id']}",due)
-            elif due-ref<=timedelta(hours=48):add(1,'Produção','⚙',f"Lote {b['code']} vence em {human_delta(due-ref)}",f"{b['product']} · {b['qty_finished']}/{b['qty_planned']} finalizadas",f"/production/{b['id']}",due)
+            level=0 if due and due<ref else 1 if due and due-ref<=timedelta(hours=48) else 2
+            label=('Sem prazo definido' if not due else
+                   f'Atrasado há {human_delta(ref-due)}' if due<ref else
+                   f'Vence em {human_delta(due-ref)}' if level==1 else
+                   f'Previsto para {due:%d/%m/%Y %H:%M}')
+            add(level,'Produção','⚙',f"Lote {b['code']} · {b['product']}",
+                f"{label} · {b['qty_finished']}/{b['qty_planned']} finalizadas",
+                f"/production/{b['id']}",f"production:{b['id']}",
+                [b['updated_at'],b['status'],b['due_at'],b['qty_finished'],b['qty_planned']],due)
+
+    scope='' if role in ('admin','gerente') else ' AND n.assignee_id=?'
+    for n in qall(c,"SELECT n.* FROM attention_notes n WHERE n.status='Pendente'"+scope+" ORDER BY n.due_at LIMIT 250",([u['id']] if scope else [])):
+        due=parse_dt(n['due_at']);high=n['priority'] in ('Alta','Urgente')
+        level=0 if due and due<ref and (ref-due).days>=1 else 1 if high or (due and due.date()<=ref.date()) else 2
+        timing='Sem prazo' if not due else f'Prazo: {due:%d/%m/%Y %H:%M}'
+        detail=(n['detail']+' · ' if n['detail'] else '')+timing
+        add(level,'Manual','✦',n['title'],detail,
+            f"/alerts/{n['id']}/edit",f"note:{n['id']}",
+            [n['updated_at'],n['title'],n['detail'],n['due_at'],n['priority'],n['assignee_id'],n['status']],due)
+
     far=ref+timedelta(days=3650)
     out.sort(key=lambda a:(a['level'],a['when'] or far))
     return out
@@ -427,6 +486,11 @@ def agenda_items(c,u):
     if role in PROD_VIEW:
         for b in qall(c,"SELECT b.*,p.name product FROM production_batches b JOIN products p ON p.id=b.product_id WHERE b.status IN ('Planejado','Em produção') AND b.due_at IS NOT NULL"):
             add(parse_dt(b['due_at']),'Produção','⚙',f"Lote {b['code']} · {b['product']}",f"{b['qty_finished']}/{b['qty_planned']} finalizadas",f"/production/{b['id']}")
+    scope='' if role in ('admin','gerente') else ' AND assignee_id=?'
+    for n in qall(c,"SELECT * FROM attention_notes WHERE status='Pendente'"+scope,
+                  ([u['id']] if scope else [])):
+        add(parse_dt(n['due_at']),'Manual','✦',n['title'],
+            n['detail'] or 'Aviso cadastrado manualmente',f"/alerts/{n['id']}/edit",n['priority'])
     far=ref+timedelta(days=3650)
     items.sort(key=lambda i:(i['when'] or far))
     return items
@@ -509,6 +573,96 @@ async def order_quick(request:Request,oid:int):
         else:raise HTTPException(400,'Ação inválida')
     return back(msg)
 
+# Gestão manual dos avisos; operações protegidas por sessão, perfil, CSRF e auditoria.
+def attention_allowed(c,u,aid):
+    note=qone(c,'SELECT * FROM attention_notes WHERE id=?',(aid,))
+    if not note:raise HTTPException(404,'Aviso não encontrado.')
+    if u['role'] not in ('admin','gerente') and note['assignee_id']!=u['id']:
+        raise HTTPException(403,'Aviso atribuído a outro usuário.')
+    return note
+
+@app.post('/alerts/dismiss')
+async def dismiss_alert(request:Request):
+    u=require(request);data=await request.form();validate_csrf(request,data)
+    key=val(data,'key',120);nxt=safe_next(data.get('next'),'/agenda')
+    with db() as c:
+        current=next((a for a in build_alerts(c,u,include_dismissed=True) if a['key']==key),None)
+        if not current:raise HTTPException(404,'Aviso não encontrado ou sem acesso.')
+        c.execute("""INSERT INTO alert_dismissals(user_id,alert_key,source_version,dismissed_at)
+                     VALUES(?,?,?,?)
+                     ON CONFLICT(user_id,alert_key) DO UPDATE SET
+                     source_version=excluded.source_version,dismissed_at=excluded.dismissed_at""",
+                  (u['id'],key,current['signature'],iso_now()))
+        audit(c,u,'alert_dismissals',u['id'],'dismiss',None,{'alert_key':key})
+    return redirect(nxt+('&' if '?' in nxt else '?')+'success='+quote('Aviso dispensado somente para você. O registro original foi preservado.'))
+
+@app.get('/alerts/new')
+def alert_new(request:Request):
+    u=require(request)
+    with db() as c:users=qall(c,'SELECT id,name FROM users WHERE active=1 ORDER BY name') if u['role'] in ('admin','gerente') else []
+    return render(request,'attention_note_form.html',section='agenda',title='Novo aviso',item={},users=users,is_edit=False)
+
+@app.post('/alerts/new')
+async def alert_create(request:Request):
+    u=require(request);data=await request.form();validate_csrf(request,data)
+    title=val(data,'title',180)
+    if not title:return redirect('/alerts/new?error='+quote('Informe um título.'))
+    try:due=clean_date(data.get('due_at'))
+    except ValueError as e:return redirect('/alerts/new?error='+quote(str(e)))
+    priority=val(data,'priority',20)
+    if priority not in PRIORITIES:priority='Média'
+    with db() as c:
+        owner=assignee(c,u,data.get('assignee_id')) if u['role'] in ('admin','gerente') else u['id']
+        values=(title,val(data,'detail',2000),due,priority,owner,u['id'])
+        cur=c.execute('INSERT INTO attention_notes(title,detail,due_at,priority,assignee_id,created_by) VALUES (?,?,?,?,?,?)',values)
+        audit(c,u,'attention_notes',cur.lastrowid,'create',None,{'title':title,'priority':priority})
+    return redirect('/?success='+quote('Novo aviso adicionado ao Dashboard.'))
+
+@app.get('/alerts/{aid}/edit')
+def alert_edit(request:Request,aid:int):
+    u=require(request)
+    with db() as c:
+        item=attention_allowed(c,u,aid)
+        users=qall(c,'SELECT id,name FROM users WHERE active=1 ORDER BY name') if u['role'] in ('admin','gerente') else []
+    return render(request,'attention_note_form.html',section='agenda',title='Editar aviso',item=item,users=users,is_edit=True)
+
+@app.post('/alerts/{aid}/edit')
+async def alert_update(request:Request,aid:int):
+    u=require(request);data=await request.form();validate_csrf(request,data)
+    title=val(data,'title',180)
+    if not title:return redirect(f'/alerts/{aid}/edit?error='+quote('Informe um título.'))
+    try:due=clean_date(data.get('due_at'))
+    except ValueError as e:return redirect(f'/alerts/{aid}/edit?error='+quote(str(e)))
+    priority=val(data,'priority',20)
+    if priority not in PRIORITIES:priority='Média'
+    with db() as c:
+        old=attention_allowed(c,u,aid)
+        owner=assignee(c,u,data.get('assignee_id')) if u['role'] in ('admin','gerente') else old['assignee_id']
+        values=dict(title=title,detail=val(data,'detail',2000),due_at=due,priority=priority,assignee_id=owner)
+        c.execute('UPDATE attention_notes SET title=?,detail=?,due_at=?,priority=?,assignee_id=?,updated_at=? WHERE id=?',
+                  (*values.values(),iso_now(),aid))
+        audit(c,u,'attention_notes',aid,'update',record(old),values)
+    return redirect('/agenda?success='+quote('Aviso atualizado.'))
+
+@app.post('/alerts/{aid}/complete')
+async def alert_complete(request:Request,aid:int):
+    u=require(request);data=await request.form();validate_csrf(request,data)
+    with db() as c:
+        old=attention_allowed(c,u,aid)
+        c.execute("UPDATE attention_notes SET status='Concluído',updated_at=? WHERE id=?",(iso_now(),aid))
+        audit(c,u,'attention_notes',aid,'complete',record(old),{'status':'Concluído'})
+    return redirect('/agenda?success='+quote('Aviso concluído.'))
+
+@app.post('/alerts/{aid}/delete')
+async def alert_delete(request:Request,aid:int):
+    u=require(request);data=await request.form();validate_csrf(request,data)
+    with db() as c:
+        old=attention_allowed(c,u,aid)
+        audit(c,u,'attention_notes',aid,'delete',record(old),None)
+        c.execute('DELETE FROM attention_notes WHERE id=?',(aid,))
+        c.execute('DELETE FROM alert_dismissals WHERE alert_key=?',(f'note:{aid}',))
+    return redirect('/agenda?success='+quote('Aviso manual excluído.'))
+
 @app.get('/agenda')
 def agenda(request:Request):
     u=require(request)
@@ -527,7 +681,7 @@ def dashboard(request:Request):
     open_rows.sort(key=lambda r:(r['ctl']['rank'],r['ctl']['due'] or now()+timedelta(days=3650)))
     kpi=dict(
         crit=sum(1 for a in alerts if a['level']==0),attn=sum(1 for a in alerts if a['level']==1),
-        followups=sum(1 for a in alerts if a['kind']=='Follow-up' and a['level']<=1),
+        followups=sum(1 for a in alerts if a['kind']=='Follow-up'),
         tasks=sum(1 for a in alerts if a['kind']=='Tarefa'),
         to_ship=sum(1 for r in open_rows if r['ctl']['stage'] in ('A iniciar','Em preparo','Pronto p/ envio')),
         in_transit=sum(1 for r in open_rows if r['ctl']['stage']=='Enviado'),
@@ -788,6 +942,18 @@ async def followup_complete(request:Request,fid:int):
         activity(c,u,old['client_id'],'Follow-up',f'Retorno sobre {old["product"]} concluído')
     return redirect('/followups?success=Follow-up concluído')
 
+@app.post('/followups/{fid}/delete')
+async def followup_delete(request:Request,fid:int):
+    u=require(request,SALES);data=await request.form();validate_csrf(request,data)
+    with db() as c:
+        old=qone(c,'SELECT * FROM followups WHERE id=?',(fid,))
+        if not old:raise HTTPException(404,'Follow-up não encontrado')
+        client_allowed(c,u,old['client_id'])
+        audit(c,u,'followups',fid,'delete',record(old),None)
+        c.execute('DELETE FROM followups WHERE id=?',(fid,))
+        c.execute('DELETE FROM alert_dismissals WHERE alert_key=?',(f'followup:{fid}',))
+    return redirect('/followups?success='+quote('Follow-up excluído.'))
+
 @app.get('/orders')
 def orders(request:Request,q:str='',status:str='',page:int=1):
     u=require(request,OPS)
@@ -970,6 +1136,19 @@ async def task_toggle(request:Request,tid:int):
                 (old['title'],old['description'],nxt,old['priority'],old['assignee_id'],old['client_id'],old['order_id'],old['recurrence']))
             audit(c,u,'tasks',cur.lastrowid,'recurring_create',None,{'due_at':nxt,'recurrence':old['recurrence']})
     return redirect('/tasks?success=Tarefa atualizada')
+
+@app.post('/tasks/{tid}/delete')
+async def task_delete(request:Request,tid:int):
+    u=require(request);data=await request.form();validate_csrf(request,data)
+    with db() as c:
+        old=qone(c,'SELECT * FROM tasks WHERE id=?',(tid,))
+        if not old:raise HTTPException(404,'Tarefa não encontrada')
+        if u['role'] not in ('admin','gerente') and old['assignee_id']!=u['id']:
+            raise HTTPException(403,'Tarefa atribuída a outro usuário')
+        audit(c,u,'tasks',tid,'delete',record(old),None)
+        c.execute('DELETE FROM tasks WHERE id=?',(tid,))
+        c.execute('DELETE FROM alert_dismissals WHERE alert_key=?',(f'task:{tid}',))
+    return redirect('/tasks?success='+quote('Tarefa excluída.'))
 
 
 # ------------------------- PRODUÇÃO -------------------------

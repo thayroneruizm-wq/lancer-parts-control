@@ -1,0 +1,25 @@
+name: Verify Lancer Parts Control
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt
+          python -m pip install pytest httpx
+      - name: Compile Python source
+        run: python -m compileall -q main.py tests
+      - name: Test main workflows
+        run: python -m pytest tests -q
