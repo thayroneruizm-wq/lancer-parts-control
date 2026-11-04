@@ -253,3 +253,89 @@ def test_recurring_task_creates_next():
         assert mod.next_occurrence('2026-01-31T10:00','Mensal')>=mod.now().replace(tzinfo=None).isoformat(timespec='minutes')
     finally:
         tmp.cleanup()
+
+
+def test_dashboard_attention_new_future_manual_dismiss_and_delete():
+    tmp,mod,c=setup()
+    try:
+        token=login(c)
+        # Uma tarefa recém-criada, mesmo sem prazo, deve aparecer.
+        c.post('/tasks/new',data={'csrf':token,'title':'Conferir nova vitrine','priority':'Média','assignee_id':'1'})
+        with mod.db() as con:
+            task=mod.qone(con,"SELECT * FROM tasks WHERE title='Conferir nova vitrine'")
+            uid=mod.record(mod.qone(con,"SELECT id,name,email,role,active FROM users WHERE id=1"))
+            keys=[a['key'] for a in mod.build_alerts(con,uid)]
+            assert f"task:{task['id']}" in keys
+        assert 'Conferir nova vitrine' in c.get('/').text
+
+        # Aviso manual aparece imediatamente no Dashboard e é persistido.
+        result=c.post('/alerts/new',data={'csrf':token,'title':'Revisar promoções','detail':'Ver preços da linha de coletores','priority':'Urgente'})
+        assert result.status_code==200
+        with mod.db() as con:
+            note=mod.qone(con,"SELECT * FROM attention_notes WHERE title='Revisar promoções'")
+            assert note and note['status']=='Pendente'
+            keys=[a['key'] for a in mod.build_alerts(con,uid)]
+            assert f"note:{note['id']}" in keys
+        assert 'Revisar promoções' in c.get('/').text
+
+        # Dispensar é individual: o registro de origem continua existindo.
+        r=c.post('/alerts/dismiss',data={'csrf':token,'key':f"task:{task['id']}",'next':'/'})
+        assert r.status_code==200
+        with mod.db() as con:
+            assert mod.qone(con,'SELECT id FROM tasks WHERE id=?',(task['id'],))
+            assert f"task:{task['id']}" not in [a['key'] for a in mod.build_alerts(con,uid)]
+        assert c.post('/alerts/dismiss',data={'csrf':'invalid','key':f"note:{note['id']}"}).status_code==403
+        assert c.post('/alerts/dismiss',data={'csrf':token,'key':'order:999:arbitrary'}).status_code==404
+
+        # Atualização de registro manual devolve o aviso à lista.
+        r=c.post('/alerts/dismiss',data={'csrf':token,'key':f"note:{note['id']}",'next':'/agenda'})
+        assert r.status_code==200
+        with mod.db() as con:
+            assert f"note:{note['id']}" not in [a['key'] for a in mod.build_alerts(con,uid)]
+        r=c.post(f"/alerts/{note['id']}/edit",data={'csrf':token,'title':'Revisar promoções agora','detail':'Verificar estoque','priority':'Alta'})
+        assert r.status_code==200
+        with mod.db() as con:
+            assert f"note:{note['id']}" in [a['key'] for a in mod.build_alerts(con,uid)]
+        r=c.post(f"/alerts/{note['id']}/delete",data={'csrf':token})
+        assert r.status_code==200
+        with mod.db() as con:
+            assert mod.qone(con,'SELECT * FROM attention_notes WHERE id=?',(note['id'],)) is None
+            assert mod.qone(con,"SELECT count(*) n FROM audit_logs WHERE entity='attention_notes' AND action='delete'")['n']==1
+
+        # Excluir tarefa retira a atenção e deixa rastro de auditoria.
+        assert c.post(f"/tasks/{task['id']}/delete",data={'csrf':token}).status_code==200
+        with mod.db() as con:
+            assert mod.qone(con,'SELECT id FROM tasks WHERE id=?',(task['id'],)) is None
+    finally:
+        tmp.cleanup()
+
+
+def test_future_followup_and_scoped_dismissal():
+    tmp,mod,c=setup()
+    try:
+        token=login(c)
+        from datetime import timedelta
+        due=(mod.now()+timedelta(days=21)).replace(tzinfo=None).isoformat(timespec='minutes')
+        c.post('/clients/new',data={'csrf':token,'name':'Cliente Futuro','phone':'62999980001','owner_id':'1'})
+        with mod.db() as con:
+            cid=mod.qone(con,"SELECT id FROM clients WHERE name='Cliente Futuro'")['id']
+        c.post('/followups/new',data={'csrf':token,'client_id':cid,'product':'Intake Full Inox','due_at':due,'priority':'Média','owner_id':'1'})
+        with mod.db() as con:
+            f=mod.qone(con,'SELECT * FROM followups WHERE client_id=?',(cid,))
+            admin=mod.record(mod.qone(con,'SELECT id,name,email,role,active FROM users WHERE id=1'))
+            alerts=mod.build_alerts(con,admin)
+            matching=[a for a in alerts if a['key']==f"followup:{f['id']}"]
+            assert len(matching)==1 and matching[0]['level']==2
+            con.execute("INSERT INTO users (name,email,password_hash,role) VALUES(?,?,?,?)",
+                        ('Vendedor dois','two@example.com',mod.hash_password('some-strong-password-234'),'vendedor'))
+            other=mod.record(mod.qone(con,"SELECT id,name,email,role,active FROM users WHERE email='two@example.com'"))
+            assert f"followup:{f['id']}" not in [a['key'] for a in mod.build_alerts(con,other)]
+        assert 'Intake Full Inox' in c.get('/').text
+        assert c.post('/alerts/dismiss',data={'csrf':token,'key':f"followup:{f['id']}",'next':'/agenda'}).status_code==200
+        with mod.db() as con:
+            assert mod.qone(con,'SELECT id FROM followups WHERE id=?',(f['id'],))
+        assert c.post(f"/followups/{f['id']}/delete",data={'csrf':token}).status_code==200
+        with mod.db() as con:
+            assert mod.qone(con,'SELECT id FROM followups WHERE id=?',(f['id'],)) is None
+    finally:
+        tmp.cleanup()
