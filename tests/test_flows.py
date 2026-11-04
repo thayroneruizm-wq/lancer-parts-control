@@ -339,3 +339,17 @@ def test_future_followup_and_scoped_dismissal():
             assert mod.qone(con,'SELECT id FROM followups WHERE id=?',(f['id'],)) is None
     finally:
         tmp.cleanup()
+
+
+def test_sidebar_prioritizes_operational_menus():
+    tmp,mod,c=setup()
+    try:
+        assert [item[0] for item in mod.NAV[:4]] == ['dashboard','fulfillment','orders','production']
+        assert len([item[0] for item in mod.NAV]) == len(set(item[0] for item in mod.NAV))
+        login(c)
+        page=c.get('/').text
+        expected=['href="/"','href="/controle-pedidos"','href="/orders"','href="/production"']
+        indices=[page.index(marker) for marker in expected]
+        assert indices==sorted(indices)
+    finally:
+        tmp.cleanup()
