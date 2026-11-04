@@ -44,15 +44,25 @@ CATEGORIES = ('Retomar orçamento','Promoção','Estoque','Aguardar pagamento','
 VEHICLES = ('Lancer GT','Lancer CVT','Lancer MT','Lancer HL','Lancer HLE','Lancer HL-T','Ralliart','Evolution X','Outro')
 LOSS_REASONS = ('','Preço','Frete','Prazo','Falta de estoque','Desistência','Concorrência','Outro')
 NAV = [
- ('dashboard','Dashboard','layout-dashboard','/'),('agenda','Agenda e Avisos','calendar','/agenda'),('clients','CRM / Clientes','users','/clients'),
- ('pipeline','Funil de Vendas','columns-3','/opportunities'),('followups','Follow-ups','alarm-clock','/followups'),
+ ('dashboard','Dashboard','layout-dashboard','/'),
+ ('fulfillment','Controle de Pedidos','clipboard-check','/controle-pedidos'),
+ ('orders','Pedidos','package','/orders'),
+ ('production','Produção','wrench','/production'),
+ ('agenda','Agenda e Avisos','calendar','/agenda'),
+ ('clients','CRM / Clientes','users','/clients'),
+ ('pipeline','Funil de Vendas','columns-3','/opportunities'),
+ ('followups','Follow-ups','alarm-clock','/followups'),
  ('whatsapp','WhatsApp / Atendimento','message-circle','/modules/whatsapp'),
- ('orders','Pedidos','package','/orders'),('fulfillment','Controle de Pedidos','clipboard-check','/controle-pedidos'),('logistics','Logística / Rastreamento','truck','/modules/logistics'),
- ('stock','Estoque e Produtos','boxes','/modules/stock'),('production','Produção','wrench','/production'),
- ('finance','Financeiro','wallet','/modules/finance'),('marketing','Marketing / Campanhas','megaphone','/modules/marketing'),
- ('after-sales','Pós-venda','heart-handshake','/modules/after-sales'),('tasks','Tarefas / Planejamento','check-square','/tasks'),
- ('reports','Relatórios','chart-no-axes-column','/reports'),('insights','Insights Lancer Parts','lightbulb','/modules/insights'),
- ('integrations','Integrações','plug','/integrations'),('team','Equipe e Permissões','shield-check','/team'),
+ ('logistics','Logística / Rastreamento','truck','/modules/logistics'),
+ ('stock','Estoque e Produtos','boxes','/modules/stock'),
+ ('finance','Financeiro','wallet','/modules/finance'),
+ ('marketing','Marketing / Campanhas','megaphone','/modules/marketing'),
+ ('after-sales','Pós-venda','heart-handshake','/modules/after-sales'),
+ ('tasks','Tarefas / Planejamento','check-square','/tasks'),
+ ('reports','Relatórios','chart-no-axes-column','/reports'),
+ ('insights','Insights Lancer Parts','lightbulb','/modules/insights'),
+ ('integrations','Integrações','plug','/integrations'),
+ ('team','Equipe e Permissões','shield-check','/team'),
  ('settings','Configurações','settings','/settings')
 ]
 
